@@ -25,6 +25,7 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.animation.AnimationTimer;
 import java.util.HashMap;
+import java.util.Random;
 import javafx.scene.control.Label;
 import java.util.ArrayList;
 import javafx.geometry.Rectangle2D;
@@ -40,7 +41,13 @@ public class Game extends Application {
 	Rectangle player;
 	//Contains all movement keys
 	HashMap<KeyCode, Boolean> keyState = new HashMap<>();
+	//Contains active enemies on the map
 	ArrayList<enemy> enemiesList = new ArrayList<>();
+
+    //spawn rate
+	long lastSpawnTime;
+	long lastDamageTime;
+    int spawnRate = 5;
 
 	//timer
     AnimationTimer timer;
@@ -48,6 +55,9 @@ public class Game extends Application {
 	long minutes;
 	long seconds;
 	Label time = new Label("0:00");
+
+    //random number
+    Random random = new Random();
 
 	//Determines screen dimensions of the user
 	Rectangle2D primaryScreenBounds = Screen.getPrimary().getBounds();
@@ -102,6 +112,8 @@ public class Game extends Application {
 
 		//Time elapsed of the game
 		startTime = System.nanoTime();
+        lastSpawnTime = System.nanoTime();
+		lastDamageTime = System.nanoTime();
 		time.setStyle("-fx-font-size: 24px; -fx-text-fill: black; -fx-font-weight: bold;");
 
 		game.getChildren().addAll(player, time);
@@ -131,6 +143,8 @@ public class Game extends Application {
 			public void handle(long now) {
 				movement();
 				timeElapsed(now);
+                spawnEnemy(now);
+				enemyDetection();
 				}
 		};
 		timer.start();
@@ -176,13 +190,117 @@ public class Game extends Application {
 		seconds = (long) (totalSeconds % 60);
 		String doubleDigitMinutes = "";
 		String doubleDigitSeconds = "";
-		if (seconds < 10) {
+		if (seconds < 10) { //makes the timer double digits
 			doubleDigitSeconds = "0";
 		}
 		if (minutes < 10) {
 			doubleDigitMinutes = "0";
 		}
 		time.setText( doubleDigitMinutes + minutes + " : " +  doubleDigitSeconds + seconds);
+	}
+
+    //spawns enemy with a cooldown
+    public void spawnEnemy(long now) {
+		if (minutes >= 1) { //spawns all types of enemies except boss
+			if ((now - lastSpawnTime) > spawnRate * 1e9) {
+				enemy newEnemy = spawnLocation("normal", 0, 0);
+				enemiesList.add(newEnemy);
+				game.getChildren().add(newEnemy.enemyShape);
+				lastSpawnTime = now;
+			}
+		}
+		else {
+			if ((now - lastSpawnTime) > spawnRate * 1e9) { //spawns only normal enemies
+				enemy newEnemy = spawnLocation("normal", 0, 0);
+				enemiesList.add(newEnemy);
+				game.getChildren().add(newEnemy.enemyShape);
+				lastSpawnTime = now;
+			}
+		}
+        if(minutes == 5 && seconds == 0) { //when the time reaches 5 minutes, the boss wil spawn
+            enemy newEnemy = spawnLocation("normal", 0, 0);
+            enemiesList.add(newEnemy);
+            game.getChildren().add(newEnemy.enemyShape);
+        }
+	}
+
+	//Checks if enemy is touching the player (Collision Detection)
+	public boolean checkCollision(Rectangle player, Rectangle enemy) {
+		if(player.getBoundsInParent().intersects(enemy.getBoundsInParent())) { //checks if player intersects with an enemy
+			return true;
+		}
+		return false;
+	}
+
+	//Pathfinds to players location
+	public void enemyDetection() {
+		for (int i = 0; i < enemiesList.size(); i++) { //loops through all enemies
+			enemy currentEnemy = enemiesList.get(i); //gets one enemy from the entire list
+			double enemyX = currentEnemy.enemyShape.getX();
+			double enemyY = currentEnemy.enemyShape.getY();
+			double enemySpeed = currentEnemy.enemySpeed;
+			//Knockback for enemy so enemy does not clip into player
+			if (checkCollision(player, currentEnemy.enemyShape)) {
+				double knockback = 45.0;
+
+				if (enemyY > player.getY()) {
+				currentEnemy.enemyShape.setY(enemyY + knockback);
+			}
+
+			else if (enemyY < player.getY()) {
+				currentEnemy.enemyShape.setY(enemyY - knockback);
+			}
+
+			if (enemyX > player.getX()) {
+				currentEnemy.enemyShape.setX(enemyX + knockback);
+			}
+
+			else if (enemyX < player.getX()) {
+				currentEnemy.enemyShape.setX(enemyX - knockback);
+			}
+			//Pathfinding to player
+			}
+			else {
+			if (enemyY > player.getY()) {
+				currentEnemy.enemyShape.setY(enemyY - enemySpeed);
+			}
+
+			else if (enemyY < player.getY()) {
+				currentEnemy.enemyShape.setY(enemyY + enemySpeed);
+			}
+
+			if (enemyX > player.getX()) {
+				currentEnemy.enemyShape.setX(enemyX - enemySpeed);
+			}
+
+			else if (enemyX < player.getX()) {
+				currentEnemy.enemyShape.setX(enemyX + enemySpeed);
+			}
+		}
+		}
+		}
+
+    //creates a random spawn location for an enemy around the border of the screen
+	public enemy spawnLocation(String enemyType, double coordX, double coordY) {
+		 random = new Random(); //creates a random spawn location with java's random class
+		int possibility = random.nextInt(1, 5);
+		if (possibility == 1) {
+			coordX = primaryScreenBounds.getMinX();
+			coordY = random.nextDouble(primaryScreenBounds.getMaxY());
+		}
+		if (possibility == 2) {
+			coordX = primaryScreenBounds.getMaxX();
+			coordY = random.nextDouble(primaryScreenBounds.getMaxY());
+		}
+		if (possibility == 3) {
+			coordX = random.nextDouble(primaryScreenBounds.getMaxX());
+			coordY = primaryScreenBounds.getMinY();
+		}
+		if (possibility == 4) {
+			coordX = random.nextDouble(primaryScreenBounds.getMaxX());
+			coordY = primaryScreenBounds.getMaxY();
+		}
+		return new enemy(enemyType, coordX, coordY);
 	}
 
 	//class for all different types of enemeies
