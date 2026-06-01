@@ -6,7 +6,7 @@
 
         * Date Created: May,28 2026
 
-        * Date Last Modified: May 30, 2026
+        * Date Last Modified: June 1, 2026
 
         */
 
@@ -30,36 +30,44 @@ import java.util.Random;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
-
 import java.util.ArrayList;
 import javafx.geometry.Rectangle2D;
 import javafx.stage.Screen;
 
 public class Game extends Application {
-	//declaring variables for player
+	//Declaring variables for player
 	int playerHealth = 100;
 	double playerSpeed = 3.0;
 	int xp = 0;
 	int enemiesDefeated = 0;
 	int score = 0;
 	Rectangle player;
+
 	//Contains all movement keys
 	HashMap<KeyCode, Boolean> keyState = new HashMap<>();
+
 	//Contains active enemies on the map
 	ArrayList<enemy> enemiesList = new ArrayList<>();
 
-    //spawn rate
+    //Spawn rate
 	long lastSpawnTime;
+	long lastBossSpawnTime;
     int spawnRate = 2;
 
-	//timer
+	//Timer
     AnimationTimer timer;
 	long startTime;
 	long minutes;
 	long seconds;
 	Label time = new Label("0:00");
 
-    //random number
+	//Healthbar
+	Rectangle healthBar;
+	Rectangle healthBackground;
+	double healthBarMaxWdith = 200.0;
+	Text healthNumber = new Text(playerHealth + "/ 100");
+
+    //Random number generator
     Random random = new Random();
 
 	//Determines screen dimensions of the user
@@ -67,14 +75,14 @@ public class Game extends Application {
 	double screenWidth = primaryScreenBounds.getWidth();
 	double screenHeight = primaryScreenBounds.getHeight();
 
-	//map
+	//Map
 	Pane game;
 
 	public static void main(String[] args) {
 		launch();
 	}
     
-    //menu screen of the game
+    //Menu screen of the game
 	@Override
 	public void start(Stage menu) {
 		Text title = new Text("Wavebound.io");
@@ -85,7 +93,7 @@ public class Game extends Application {
 		shadow.setOffsetY(4.0f);
 		title.setEffect(shadow);
 		Text text = new Text("Survive the Waves...");
-		text.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 25px; -fx-fill: white");
+		text.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 25px; -fx-fill: green");
 
 		//Buttons to play the game
 		Button button = new Button("Click to Play!");
@@ -93,7 +101,7 @@ public class Game extends Application {
 		VBox layout = new VBox(10);
 		layout.setAlignment(Pos.CENTER);
 		layout.getChildren().addAll(title, text, button);
-		//Determins which difficulty is pressed
+		//Determins if a button is pressed
 		button.setOnAction(event -> gameStart(menu));
 
 		//Creates a image for the background
@@ -115,7 +123,7 @@ public class Game extends Application {
 
 	//Stage for the game itself
 	public void gameStart(Stage gameStart) {
-		//Creates background
+		//Creates background for the game
 		game = new Pane();
 		Image backgroundImage = new Image("/assets/background.png", false);
         ImagePattern backgroundPattern = new ImagePattern(backgroundImage);
@@ -124,23 +132,36 @@ public class Game extends Application {
         background.setFill(backgroundPattern);
         game.getChildren().add(background);
 
-		//Creates player
+		//Creates player with an image
 		player = new Rectangle(60, 60, Color.TRANSPARENT);
 		Image playerImage = new Image("/assets/Player.png", false);
 		ImagePattern playerPattern = new ImagePattern(playerImage);
 		player.setFill(playerPattern);
 		player.setCache(true);
 		
-		//resets old values
+		//Reset old values
 		playerHealth = 100;
 		xp = 0;
 		enemiesDefeated = 0;
 		score = 0;
 		enemiesList.clear();
+		healthNumber.setText(playerHealth + "/100");
+
+		//Healthbar
+		healthBar = new Rectangle(healthBarMaxWdith, 20, Color.RED);
+		healthBackground = new Rectangle(healthBarMaxWdith, 20, Color.BLACK);
+		healthNumber.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 24px; -fx-font-weight: bold; -fx-fill: red;");
+		healthBackground.setX(20);
+		healthBackground.setY(20);
+		healthBar.setX(20);
+		healthBar.setY(20);
+		healthNumber.setX(240);
+		healthNumber.setY(37);
 
 		//Time elapsed of the game
 		startTime = System.nanoTime();
         lastSpawnTime = System.nanoTime();
+		lastBossSpawnTime = System.nanoTime();
 		
 		DropShadow shadow = new DropShadow(); //Creates a shadow effect on text
 		shadow.setOffsetX(4.0f);
@@ -148,7 +169,7 @@ public class Game extends Application {
 		time.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: white");
 		time.setEffect(shadow);
 
-		game.getChildren().addAll(player, time);
+		game.getChildren().addAll(player, time, healthBackground, healthBar, healthNumber);
 		Scene scene = new Scene(game, screenWidth, screenHeight);
 		gameStart.setScene(scene);
 		gameStart.setFullScreen(true);
@@ -177,6 +198,7 @@ public class Game extends Application {
 				timeElapsed(now);
                 spawnEnemy(now);
 				enemyDetection();
+				damageCheck(now);
 				if (playerHealth <= 0) { //Ends the game when health reaches zero
 					end(gameStart);
 					stop();
@@ -232,7 +254,7 @@ public class Game extends Application {
 		if (keyState.get(KeyCode.D)) {
 			player.setX(player.getX() + playerSpeed);
 		}
-		//bounderies for the game to prevent player for exiting
+		//Bounderies for the game to prevent player for exiting
 		if(player.getX() < 0) {
 			player.setX(0);
 		}
@@ -248,31 +270,38 @@ public class Game extends Application {
 		}
 	}
 
-	//timer for the game
+	//Timer for the game
 	public void timeElapsed(long now) {
 		double totalSeconds = (now - startTime) * 1e-9;
 		minutes = (long) (totalSeconds / 60);
 		seconds = (long) (totalSeconds % 60);
 		String doubleDigitMinutes = "";
 		String doubleDigitSeconds = "";
-		if (seconds < 10) { //makes the timer double digits
+		if (seconds < 10) { //Allows for double digits when the seconds are one digit
 			doubleDigitSeconds = "0";
 		}
-		if (minutes < 10) {
+		if (minutes < 10) { //Allows for double digits when the seconds are one digit
 			doubleDigitMinutes = "0";
 		}
 		time.setText( doubleDigitMinutes + minutes + " : " +  doubleDigitSeconds + seconds);
 	}
 
-    //spawns enemy with a cooldown
+    //Spawns enemy with a cooldown
     public void spawnEnemy(long now) {
 		if (minutes >= 1) { //spawns all types of enemies except boss
 			if ((now - lastSpawnTime) > spawnRate * 1e9) {
-				enemy newEnemy = spawnLocation("normal", 0, 0);
+				enemy newEnemy = spawnLocation(randomEnemy(), 0, 0); //uses randomEnemy function
 				enemiesList.add(newEnemy);
 				game.getChildren().add(newEnemy.enemyShape);
 				lastSpawnTime = now;
 			}
+		if (minutes >= 2) { //will spawn boss after two minutes with intervals of two minutes
+			if ((now -lastSpawnTime) > spawnRate * 60e9) {
+				enemy newEnemy = spawnLocation("boss", 0, 0);
+				enemiesList.add(newEnemy);
+				game.getChildren().add(newEnemy.enemyShape);
+			}
+		}
 		}
 		else {
 			if ((now - lastSpawnTime) > spawnRate * 1e9) { //spawns only normal enemies
@@ -291,11 +320,9 @@ public class Game extends Application {
 
 	//Checks if enemy is touching the player (Collision Detection)
 	public boolean checkCollision(Rectangle player, Rectangle enemy) {
-		if(player.getBoundsInParent().intersects(enemy.getBoundsInParent())) { //checks if player intersects with an enemy
-			return true;
-		}
-		return false;
+		return (player.getBoundsInParent().intersects(enemy.getBoundsInParent())); //checks if player intersects with an enemy
 	}
+
 
 	//Pathfinds to players location
 	public void enemyDetection() {
@@ -349,26 +376,53 @@ public class Game extends Application {
 	public enemy spawnLocation(String enemyType, double coordX, double coordY) {
 		 random = new Random(); //creates a random spawn location with java's random class
 		int possibility = random.nextInt(1, 5);
-		if (possibility == 1) {
+		if (possibility == 1) { //spawns on the left border
 			coordX = primaryScreenBounds.getMinX();
 			coordY = random.nextDouble(primaryScreenBounds.getMaxY());
 		}
-		if (possibility == 2) {
+		if (possibility == 2) { //spawns on the right border
 			coordX = primaryScreenBounds.getMaxX();
 			coordY = random.nextDouble(primaryScreenBounds.getMaxY());
 		}
-		if (possibility == 3) {
+		if (possibility == 3) { //spanws on the top border
 			coordX = random.nextDouble(primaryScreenBounds.getMaxX());
 			coordY = primaryScreenBounds.getMinY();
-		}
-		if (possibility == 4) {
+		} 
+		if (possibility == 4) { //spawns on the bottom border
 			coordX = random.nextDouble(primaryScreenBounds.getMaxX());
 			coordY = primaryScreenBounds.getMaxY();
 		}
 		return new enemy(enemyType, coordX, coordY);
 	}
 
-	//class for all different types of enemeies
+	//Generates random enemy
+	public String randomEnemy() {
+		String enemyType = "normal"; //First possibilty
+		int possibility = random.nextInt( 3);
+		if (possibility == 0) { //Second possibilty
+			enemyType = "fast";
+		}
+		
+		else if (possibility == 1) { //Third possibility
+			enemyType = "tank";
+		}
+		return enemyType;
+	}
+
+	//Checks if player is taking damage and updates healthbar
+	public void damageCheck(long now) {
+		for (int i = enemiesList.size() - 1; i >= 0; i--) {
+			enemy currentEnemy = enemiesList.get(i); //gets currentEnemy with arrayList
+			if (checkCollision(player, currentEnemy.enemyShape)) { //Checks if enemy touches player
+					playerHealth -= currentEnemy.enemyDamage;
+					int newHealth = Math.max(0, playerHealth);
+					healthBar.setWidth((newHealth / 100.0) * healthBarMaxWdith); //Changes healthbar visual
+					healthNumber.setText(playerHealth + "/100");
+		}
+	}
+	}
+
+	//Class for all different types of enemeies
 	public class enemy {
 		int enemyHealth;
 		double enemySpeed;
@@ -386,7 +440,7 @@ public class Game extends Application {
                 Image image = new Image("/assets/Slimes/normal.png", false);
                 ImagePattern imagePattern = new ImagePattern(image);
 				enemyShape = new Rectangle(50, 50, Color.TRANSPARENT);
-                enemyShape.setCache(true);
+                enemyShape.setCache(true); //reduces resources used (performance increase)
                 enemyShape.setFill(imagePattern);
 			}
 
@@ -425,7 +479,7 @@ public class Game extends Application {
                 enemyShape.setCache(true);
                 enemyShape.setFill(imagePattern);
 			}
-			//sets the coordinates for the enemies
+			//Sets the coordinates for the enemies
 			enemyShape.setX(coordX);
 			enemyShape.setY(coordY);
 		}
