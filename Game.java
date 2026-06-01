@@ -20,6 +20,7 @@ import javafx.stage.Stage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.ImagePattern;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
@@ -27,6 +28,9 @@ import javafx.animation.AnimationTimer;
 import java.util.HashMap;
 import java.util.Random;
 import javafx.scene.control.Label;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.image.Image;
+
 import java.util.ArrayList;
 import javafx.geometry.Rectangle2D;
 import javafx.stage.Screen;
@@ -46,8 +50,7 @@ public class Game extends Application {
 
     //spawn rate
 	long lastSpawnTime;
-	long lastDamageTime;
-    int spawnRate = 5;
+    int spawnRate = 2;
 
 	//timer
     AnimationTimer timer;
@@ -76,21 +79,35 @@ public class Game extends Application {
 	public void start(Stage menu) {
 		Text title = new Text("Wavebound.io");
 		title.setTextAlignment(TextAlignment.CENTER);
-		title.setStyle("-fx-font-size: 50px; -fx-font-weight: bold;");
+		title.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 100px; -fx-font-weight: bold; -fx-fill: white");
+		DropShadow shadow = new DropShadow(); //Creates a shadow effect on text
+		shadow.setOffsetX(4.0f);
+		shadow.setOffsetY(4.0f);
+		title.setEffect(shadow);
 		Text text = new Text("Survive the Waves...");
-		text.setStyle("-fx-font-size: 25px;");
+		text.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 25px; -fx-fill: white");
 
 		//Buttons to play the game
 		Button button = new Button("Click to Play!");
+		button.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 15px; -fx-fill: black");
 		VBox layout = new VBox(10);
 		layout.setAlignment(Pos.CENTER);
 		layout.getChildren().addAll(title, text, button);
 		//Determins which difficulty is pressed
 		button.setOnAction(event -> gameStart(menu));
-		//Shows menu
+
+		//Creates a image for the background
+        Image backgroundImage = new Image("/assets/menu.png", false);
+        ImagePattern backgroundPattern = new ImagePattern(backgroundImage);
+        Rectangle background = new Rectangle(screenWidth, screenHeight);
+        background.setCache(true);
+        background.setFill(backgroundPattern);
+        background.setMouseTransparent(true);
         StackPane main = new StackPane();
-        main.getChildren().addAll(layout);
-        Scene scene = new Scene(main, screenWidth, screenHeight);
+        main.getChildren().addAll(background, layout);
+
+		//Shows menu
+		Scene scene = new Scene(main, screenWidth, screenHeight);
 		menu.setScene(scene);
 		menu.setFullScreen(true);
 		menu.show();
@@ -100,9 +117,20 @@ public class Game extends Application {
 	public void gameStart(Stage gameStart) {
 		//Creates background
 		game = new Pane();
+		Image backgroundImage = new Image("/assets/background.png", false);
+        ImagePattern backgroundPattern = new ImagePattern(backgroundImage);
+        Rectangle background = new Rectangle(screenWidth, screenHeight);
+        background.setCache(true);
+        background.setFill(backgroundPattern);
+        game.getChildren().add(background);
 
 		//Creates player
-		player = new Rectangle(60, 60, Color.BLUE);
+		player = new Rectangle(60, 60, Color.TRANSPARENT);
+		Image playerImage = new Image("/assets/Player.png", false);
+		ImagePattern playerPattern = new ImagePattern(playerImage);
+		player.setFill(playerPattern);
+		player.setCache(true);
+		
 		//resets old values
 		playerHealth = 100;
 		xp = 0;
@@ -113,8 +141,12 @@ public class Game extends Application {
 		//Time elapsed of the game
 		startTime = System.nanoTime();
         lastSpawnTime = System.nanoTime();
-		lastDamageTime = System.nanoTime();
-		time.setStyle("-fx-font-size: 24px; -fx-text-fill: black; -fx-font-weight: bold;");
+		
+		DropShadow shadow = new DropShadow(); //Creates a shadow effect on text
+		shadow.setOffsetX(4.0f);
+		shadow.setOffsetY(4.0f);
+		time.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: white");
+		time.setEffect(shadow);
 
 		game.getChildren().addAll(player, time);
 		Scene scene = new Scene(game, screenWidth, screenHeight);
@@ -145,9 +177,42 @@ public class Game extends Application {
 				timeElapsed(now);
                 spawnEnemy(now);
 				enemyDetection();
+				if (playerHealth <= 0) { //Ends the game when health reaches zero
+					end(gameStart);
+					stop();
+				}
 				}
 		};
 		timer.start();
+	}
+
+	//Will run if the player reaches zero health
+	public void end (Stage end) {
+		score = (int) ((minutes * 5) + (seconds + 1) + (enemiesDefeated * 10));
+		Text gameOver = new Text("Game Over");
+        gameOver.setStyle("-fx-font: 80px 'Impact'; -fx-font-weight: bold; -fx-fill: red");
+		Text scoreText = new Text("Score: " + score);
+		scoreText.setStyle("-fx-font: 24px 'Impact'; -fx-font-weight: bold; -fx-fill: red;");
+		Button button = new Button("Click to Play Again!");
+		button.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 15px; -fx-fill: black");
+		VBox layout = new VBox(20);
+		layout.setAlignment(Pos.CENTER);
+		layout.getChildren().addAll(gameOver, scoreText, button);
+		//Game over background
+        Image backgroundImage = new Image("/assets/gameOver.png", false);
+        ImagePattern backgroundPattern = new ImagePattern(backgroundImage);
+        Rectangle background = new Rectangle(screenWidth, screenHeight);
+        background.setCache(true);
+        background.setFill(backgroundPattern);
+        background.setMouseTransparent(true);
+
+        StackPane main = new StackPane();
+        main.getChildren().addAll(background, layout);
+        Scene scene = new Scene(main, screenWidth, screenHeight);
+		end.setScene(scene);
+		end.setFullScreen(true);
+		end.show();
+		button.setOnAction(event -> gameStart(end));
 	}
 
 	//Determines how to move with WASD using KeyCode
@@ -317,28 +382,48 @@ public class Game extends Application {
 				enemyHealth = 50;
 				enemySpeed = 1.0;
 				enemyDamage = 10;
-                enemyShape = new Rectangle(80, 80, Color.GREEN);
+				//Image for normal slime
+                Image image = new Image("/assets/Slimes/normal.png", false);
+                ImagePattern imagePattern = new ImagePattern(image);
+				enemyShape = new Rectangle(50, 50, Color.TRANSPARENT);
+                enemyShape.setCache(true);
+                enemyShape.setFill(imagePattern);
 			}
 
 			if (type.equals("tank")) {
 				enemyHealth = 100;
 				enemySpeed = 0.5;
 				enemyDamage = 5;
-                enemyShape = new Rectangle(80, 80, Color.YELLOW);
+				//Image for tank slime
+				Image image = new Image("/assets/Slimes/tank.png", false);
+                ImagePattern imagePattern = new ImagePattern(image);
+				enemyShape = new Rectangle(50, 50, Color.TRANSPARENT);
+                enemyShape.setCache(true);
+                enemyShape.setFill(imagePattern);
 			}
 
 			if (type.equals("fast")) {
 				enemyHealth = 25;
 				enemySpeed = 2.0;
 				enemyDamage = 15;
-                enemyShape = new Rectangle(80, 80, Color.BLUE);
+				//Image for fast slime
+				Image image = new Image("/assets/Slimes/fast.png", false);
+                ImagePattern imagePattern = new ImagePattern(image);
+				enemyShape = new Rectangle(50, 50, Color.TRANSPARENT);
+                enemyShape.setCache(true);
+                enemyShape.setFill(imagePattern);
 			}
 
 			if (type.equals("boss")) {
 				enemyHealth = 200;
 				enemySpeed = 0.1;
 				enemyDamage = 20;
-                enemyShape = new Rectangle(80, 80, Color.RED);
+				//Image for boss slime
+				Image image = new Image("/assets/Slimes/boss.png", false);
+                ImagePattern imagePattern = new ImagePattern(image);
+				enemyShape = new Rectangle(90, 90, Color.TRANSPARENT);
+                enemyShape.setCache(true);
+                enemyShape.setFill(imagePattern);
 			}
 			//sets the coordinates for the enemies
 			enemyShape.setX(coordX);
