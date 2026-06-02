@@ -6,7 +6,7 @@
 
         * Date Created: May,28 2026
 
-        * Date Last Modified: June 1, 2026
+        * Date Last Modified: June 2, 2026
 
         */
 
@@ -18,6 +18,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.ImagePattern;
@@ -38,7 +39,9 @@ public class Game extends Application {
 	//Declaring variables for player
 	int playerHealth = 100;
 	double playerSpeed = 3.0;
-	int xp = 0;
+	int playerXp = 0;
+	int playerLevel;
+	boolean playerLeveledUp;
 	int enemiesDefeated = 0;
 	int score = 0;
 	Rectangle player;
@@ -48,6 +51,9 @@ public class Game extends Application {
 
 	//Contains active enemies on the map
 	ArrayList<enemy> enemiesList = new ArrayList<>();
+
+	//Contains all active projectiles on the map
+	ArrayList<projectileAbility> projectileList = new ArrayList<>();
 
     //Spawn rate
 	long lastSpawnTime;
@@ -67,6 +73,12 @@ public class Game extends Application {
 	double healthBarMaxWdith = 200.0;
 	Text healthNumber = new Text(playerHealth + "/ 100");
 
+	//Xpbar
+	Rectangle xpBar;
+	Rectangle xpBarBackground;
+	double xpBarMaxWidth = 200.0;
+	Text lvlText = new Text( "level " + playerLevel);
+
     //Random number generator
     Random random = new Random();
 
@@ -74,6 +86,10 @@ public class Game extends Application {
 	Rectangle2D primaryScreenBounds = Screen.getPrimary().getBounds();
 	double screenWidth = primaryScreenBounds.getWidth();
 	double screenHeight = primaryScreenBounds.getHeight();
+
+	//Mouse Click 
+	double mouseClickX;
+	double mouseClickY;
 
 	//Map
 	Pane game;
@@ -141,7 +157,7 @@ public class Game extends Application {
 		
 		//Reset old values
 		playerHealth = 100;
-		xp = 0;
+		playerXp = 0;
 		enemiesDefeated = 0;
 		score = 0;
 		enemiesList.clear();
@@ -158,6 +174,17 @@ public class Game extends Application {
 		healthNumber.setX(240);
 		healthNumber.setY(37);
 
+		//Xpbar
+		xpBar = new Rectangle(0, 20, Color.BLUE);
+		xpBarBackground = new Rectangle(xpBarMaxWidth, 20, Color.BLACK);
+		lvlText.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 24px; -fx-font-weight: bold; -fx-fill: blue;");
+		xpBarBackground.setX(20);
+		xpBarBackground.setY(50);
+		xpBar.setX(20);
+		xpBar.setY(50);
+		lvlText.setX(240);
+		lvlText.setY(67);
+
 		//Time elapsed of the game
 		startTime = System.nanoTime();
         lastSpawnTime = System.nanoTime();
@@ -169,7 +196,7 @@ public class Game extends Application {
 		time.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: white");
 		time.setEffect(shadow);
 
-		game.getChildren().addAll(player, time, healthBackground, healthBar, healthNumber);
+		game.getChildren().addAll(player, time, healthBackground, healthBar, healthNumber, xpBarBackground, xpBar, lvlText);
 		Scene scene = new Scene(game, screenWidth, screenHeight);
 		gameStart.setScene(scene);
 		gameStart.setFullScreen(true);
@@ -190,6 +217,14 @@ public class Game extends Application {
 		//Adds key pressed to hashmap.
 		scene.setOnKeyPressed(event -> keyState.put(event.getCode(), true));
 		scene.setOnKeyReleased(event -> keyState.put(event.getCode(), false));
+		//Adds Mouse click
+		scene.setOnMouseClicked(event -> {
+			if (event.getButton() == MouseButton.PRIMARY) { //Runs if left click of mouse is clicked
+				mouseClickX = event.getSceneX();
+				mouseClickY = event.getSceneY();
+				projectileFireball(player.getX(), player.getY()); //Creates the projectile
+			}
+		});
 		//Animation timer for smooth gameplay
 		timer = new AnimationTimer() {
 			@Override
@@ -420,6 +455,45 @@ public class Game extends Application {
 					healthNumber.setText(playerHealth + "/100");
 		}
 	}
+	}
+
+	//Fireball projectile
+	public void projectileFireball(double x, double y) {
+		projectileAbility fireball = new projectileAbility("fireball", x, y);
+		double changeX = mouseClickX - x; //finds the x component
+		double changeY = mouseClickY - y; //finds the y component
+		double distance = Math.sqrt(Math.pow(changeX, 2) + Math.pow(changeY, 2)); //pythagorean theorm to determine the distance 
+		fireball.velocityX = ((changeX / distance) * fireball.projectileSpeed); //adds projectile speed to the projectile
+		fireball.velocityY = ((changeY / distance) * fireball.projectileSpeed);
+		projectileList.add(fireball);
+		game.getChildren().add(fireball.projectileShape);
+		}
+
+	//Class that contains abilties
+	public class projectileAbility {
+		double projectileSpeed;
+		int projectileDamage;
+		Rectangle projectileShape;
+		String type;
+		double velocityX;
+		double velocityY;
+
+		projectileAbility (String projectileType, double coordX, double coordY) {
+			type = projectileType;
+			if (type.equals("fireball")) {
+				projectileSpeed = 4.0;
+				projectileDamage = 25;
+
+				//Image for projectile
+                Image image = new Image("/assets/fireball.png", false);
+                ImagePattern imagePattern = new ImagePattern(image);
+				projectileShape = new Rectangle(20, 20, Color.TRANSPARENT);
+                projectileShape.setCache(true);
+                projectileShape.setFill(imagePattern);
+			}
+				projectileShape.setX(coordX);
+				projectileShape.setY(coordY);
+		}
 	}
 
 	//Class for all different types of enemeies
