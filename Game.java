@@ -6,7 +6,7 @@
 
         * Date Created: May,28 2026
 
-        * Date Last Modified: June 2, 2026
+        * Date Last Modified: June 3, 2026
 
         */
 
@@ -40,8 +40,8 @@ public class Game extends Application {
 	int playerHealth = 100;
 	double playerSpeed = 3.0;
 	int playerXp = 0;
-	int playerLevel;
-	boolean playerLeveledUp;
+	int playerLevel = 0;
+	boolean playerLeveledUp = false;
 	int enemiesDefeated = 0;
 	int score = 0;
 	Rectangle player;
@@ -59,6 +59,10 @@ public class Game extends Application {
 	long lastSpawnTime;
 	long lastBossSpawnTime;
     int spawnRate = 2;
+
+	//Cooldowns
+	long lastDamageTime;
+	long damageCooldown = (long) (5 * 1e8);
 
 	//Timer
     AnimationTimer timer;
@@ -78,6 +82,9 @@ public class Game extends Application {
 	Rectangle xpBarBackground;
 	double xpBarMaxWidth = 200.0;
 	Text lvlText = new Text( "level " + playerLevel);
+
+	//Enemies killed;
+	Text defeatedText = new Text("Slain: " + enemiesDefeated);
 
     //Random number generator
     Random random = new Random();
@@ -109,7 +116,7 @@ public class Game extends Application {
 		shadow.setOffsetY(4.0f);
 		title.setEffect(shadow);
 		Text text = new Text("Survive the Waves...");
-		text.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 25px; -fx-fill: green");
+		text.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 25px; -fx-fill: white");
 
 		//Buttons to play the game
 		Button button = new Button("Click to Play!");
@@ -185,10 +192,16 @@ public class Game extends Application {
 		lvlText.setX(240);
 		lvlText.setY(67);
 
+		//Enemies killed counter
+		defeatedText.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 24px; -fx-font-weight: bold; -fx-fill: white;");
+		defeatedText.setY(100);
+		defeatedText.setX(20);
+
 		//Time elapsed of the game
 		startTime = System.nanoTime();
         lastSpawnTime = System.nanoTime();
 		lastBossSpawnTime = System.nanoTime();
+		lastDamageTime = System.nanoTime();
 		
 		DropShadow shadow = new DropShadow(); //Creates a shadow effect on text
 		shadow.setOffsetX(4.0f);
@@ -196,7 +209,7 @@ public class Game extends Application {
 		time.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: white");
 		time.setEffect(shadow);
 
-		game.getChildren().addAll(player, time, healthBackground, healthBar, healthNumber, xpBarBackground, xpBar, lvlText);
+		game.getChildren().addAll(player, time, healthBackground, healthBar, healthNumber, xpBarBackground, xpBar, lvlText, defeatedText);
 		Scene scene = new Scene(game, screenWidth, screenHeight);
 		gameStart.setScene(scene);
 		gameStart.setFullScreen(true);
@@ -233,11 +246,21 @@ public class Game extends Application {
 				timeElapsed(now);
                 spawnEnemy(now);
 				enemyDetection();
-				damageCheck(now);
+				playerDamageCheck(now);
+				moveProjectile();
+				projectileHitDetection();
 				if (playerHealth <= 0) { //Ends the game when health reaches zero
 					end(gameStart);
 					stop();
 				}
+				healthBackground.toFront();
+				healthBar.toFront();
+				healthNumber.toFront();
+				xpBarBackground.toFront();
+				xpBar.toFront();
+				lvlText.toFront();
+				defeatedText.toFront();
+				time.toFront();
 				}
 		};
 		timer.start();
@@ -445,17 +468,54 @@ public class Game extends Application {
 	}
 
 	//Checks if player is taking damage and updates healthbar
-	public void damageCheck(long now) {
-		for (int i = enemiesList.size() - 1; i >= 0; i--) {
-			enemy currentEnemy = enemiesList.get(i); //gets currentEnemy with arrayList
-			if (checkCollision(player, currentEnemy.enemyShape)) { //Checks if enemy touches player
+	public void playerDamageCheck(long now) {
+		if (now - lastDamageTime > damageCooldown) {
+			for (int i = enemiesList.size() - 1; i >= 0; i--) {
+				enemy currentEnemy = enemiesList.get(i); //gets currentEnemy with arrayList
+				if (checkCollision(player, currentEnemy.enemyShape)) { //Checks if enemy touches player
 					playerHealth -= currentEnemy.enemyDamage;
 					int newHealth = Math.max(0, playerHealth);
 					healthBar.setWidth((newHealth / 100.0) * healthBarMaxWdith); //Changes healthbar visual
 					healthNumber.setText(playerHealth + "/100");
+				}
+			}
 		}
 	}
-	}
+
+	//Projectile damage check
+	public void projectileHitDetection() {
+		for (int i = projectileList.size() - 1; i >= 0; i--) { //iterates through array backwards to prevent crashing
+			projectileAbility currentProjectile = projectileList.get(i);
+			boolean projectileRemoved = false;  //If projectile is removed, everything is skipped
+
+			for (int j = enemiesList.size() - 1; j >= 0 && !projectileRemoved; j--) { //iternates through array backwards to prevent crashing
+				enemy currentEnemy = enemiesList.get(j);
+
+				if (checkCollision(currentProjectile.projectileShape, currentEnemy.enemyShape)) { //determines if projectile hits an enemy
+					currentEnemy.enemyHealth -= currentProjectile.projectileDamage;
+					projectileRemoved = true;
+					game.getChildren().remove(currentProjectile.projectileShape);
+					projectileList.remove(i);
+
+						playerXp += currentEnemy.enemyXp;
+						while (playerXp >= 100) { //Levels up player
+							playerLevel++;
+							playerLeveledUp = true;
+							lvlText.setText("level " + playerLevel);
+							playerXp -= 100;
+							xpBar.setWidth(0);
+						}
+
+						xpBar.setWidth((playerXp / 100.0) * xpBarMaxWidth); //Changes xpBar visual
+						defeatedText.setText("Slain: " + enemiesDefeated);
+
+						enemiesList.remove(j);
+						game.getChildren().remove(currentEnemy.enemyShape);
+						enemiesDefeated++;
+					}
+				}
+			}
+		}
 
 	//Fireball projectile
 	public void projectileFireball(double x, double y) {
@@ -468,6 +528,25 @@ public class Game extends Application {
 		projectileList.add(fireball);
 		game.getChildren().add(fireball.projectileShape);
 		}
+
+		//Move projectiles
+	public void moveProjectile() { //Moves projectile to mouse click
+		for (int i = projectileList.size() - 1; i >= 0; i--) {
+			projectileAbility p = projectileList.get(i);
+
+			if (p.type.equals( "fireball")) {
+				p.projectileShape.setX(p.projectileShape.getX() + p.velocityX);
+				p.projectileShape.setY(p.projectileShape.getY() + p.velocityY);
+				double projectileY = p.projectileShape.getY();
+				double projectileX = p.projectileShape.getX();
+				//removes porjectiles that pass the screen border
+				if (projectileX > screenWidth || projectileX < 0 || projectileY > screenHeight || projectileY < 0 ) {
+					projectileList.remove(i);
+					game.getChildren().remove(p.projectileShape);
+				}
+			}
+		}
+	}
 
 	//Class that contains abilties
 	public class projectileAbility {
@@ -501,6 +580,7 @@ public class Game extends Application {
 		int enemyHealth;
 		double enemySpeed;
 		int enemyDamage;
+		int enemyXp;
 		Rectangle enemyShape;
 		String type;
 
