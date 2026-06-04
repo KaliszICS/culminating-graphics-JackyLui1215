@@ -22,6 +22,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.ImagePattern;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
@@ -50,10 +51,10 @@ public class Game extends Application {
 	HashMap<KeyCode, Boolean> keyState = new HashMap<>();
 
 	//Contains active enemies on the map
-	ArrayList<enemy> enemiesList = new ArrayList<>();
+	ArrayList<Enemy> enemiesList = new ArrayList<>();
 
 	//Contains all active projectiles on the map
-	ArrayList<projectileAbility> projectileList = new ArrayList<>();
+	ArrayList<ProjectileAbility> projectileList = new ArrayList<>();
 
     //Spawn rate
 	long lastSpawnTime;
@@ -97,6 +98,16 @@ public class Game extends Application {
 	//Mouse Click 
 	double mouseClickX;
 	double mouseClickY;
+
+	//All images
+	ImagePattern fireballPattern;
+	ImagePattern boomerangPattern;
+	ImagePattern normalSlimePattern;
+	ImagePattern tankSlimePattern;
+	ImagePattern fastSlimePattern;
+	ImagePattern bossSlimePattern;
+	ImagePattern lifeStealPattern;
+	ImagePattern auraPattern;
 
 	//Map
 	Pane game;
@@ -146,6 +157,16 @@ public class Game extends Application {
 
 	//Stage for the game itself
 	public void gameStart(Stage gameStart) {
+		//Loads all images at once
+		fireballPattern = new ImagePattern(new Image("/assets/fireball.png"));
+		boomerangPattern = new ImagePattern(new Image("/assets/boomerang.png"));
+		normalSlimePattern = new ImagePattern(new Image("/assets/slimes/normal.png"));
+		tankSlimePattern = new ImagePattern(new Image("/assets/slimes/tank.png"));
+		fastSlimePattern = new ImagePattern(new Image("/assets/slimes/fast.png"));
+		bossSlimePattern = new ImagePattern(new Image("/assets/slimes/boss.png"));
+		lifeStealPattern = new ImagePattern(new Image("/assets/lifesteal.png"));
+		auraPattern = new ImagePattern(new Image("/assets/aura.png"));
+		
 		//Creates background for the game
 		game = new Pane();
 		Image backgroundImage = new Image("/assets/background.png", false);
@@ -348,14 +369,14 @@ public class Game extends Application {
     public void spawnEnemy(long now) {
 		if (minutes >= 1) { //spawns all types of enemies except boss
 			if ((now - lastSpawnTime) > spawnRate * 1e9) {
-				enemy newEnemy = spawnLocation(randomEnemy(), 0, 0); //uses randomEnemy function
+				Enemy newEnemy = spawnLocation(randomEnemy(), 0, 0); //uses randomEnemy function
 				enemiesList.add(newEnemy);
 				game.getChildren().add(newEnemy.enemyShape);
 				lastSpawnTime = now;
 			}
 		if (minutes >= 2) { //will spawn boss after two minutes with intervals of two minutes
 			if ((now -lastSpawnTime) > spawnRate * 60e9) {
-				enemy newEnemy = spawnLocation("boss", 0, 0);
+				Enemy newEnemy = spawnLocation("boss", 0, 0);
 				enemiesList.add(newEnemy);
 				game.getChildren().add(newEnemy.enemyShape);
 			}
@@ -363,14 +384,14 @@ public class Game extends Application {
 		}
 		else {
 			if ((now - lastSpawnTime) > spawnRate * 1e9) { //spawns only normal enemies
-				enemy newEnemy = spawnLocation("normal", 0, 0);
+				Enemy newEnemy = spawnLocation("normal", 0, 0);
 				enemiesList.add(newEnemy);
 				game.getChildren().add(newEnemy.enemyShape);
 				lastSpawnTime = now;
 			}
 		}
         if(minutes == 5 && seconds == 0) { //when the time reaches 5 minutes, the boss wil spawn
-            enemy newEnemy = spawnLocation("normal", 0, 0);
+            Enemy newEnemy = spawnLocation("normal", 0, 0);
             enemiesList.add(newEnemy);
             game.getChildren().add(newEnemy.enemyShape);
         }
@@ -385,7 +406,7 @@ public class Game extends Application {
 	//Pathfinds to players location
 	public void enemyDetection() {
 		for (int i = 0; i < enemiesList.size(); i++) { //loops through all enemies
-			enemy currentEnemy = enemiesList.get(i); //gets one enemy from the entire list
+			Enemy currentEnemy = enemiesList.get(i); //gets one enemy from the entire list
 			double enemyX = currentEnemy.enemyShape.getX();
 			double enemyY = currentEnemy.enemyShape.getY();
 			double enemySpeed = currentEnemy.enemySpeed;
@@ -431,7 +452,7 @@ public class Game extends Application {
 		}
 
     //creates a random spawn location for an enemy around the border of the screen
-	public enemy spawnLocation(String enemyType, double coordX, double coordY) {
+	public Enemy spawnLocation(String enemyType, double coordX, double coordY) {
 		 random = new Random(); //creates a random spawn location with java's random class
 		int possibility = random.nextInt(1, 5);
 		if (possibility == 1) { //spawns on the left border
@@ -450,7 +471,7 @@ public class Game extends Application {
 			coordX = random.nextDouble(primaryScreenBounds.getMaxX());
 			coordY = primaryScreenBounds.getMaxY();
 		}
-		return new enemy(enemyType, coordX, coordY);
+		return new Enemy(enemyType, coordX, coordY);
 	}
 
 	//Generates random enemy
@@ -471,7 +492,7 @@ public class Game extends Application {
 	public void playerDamageCheck(long now) {
 		if (now - lastDamageTime > damageCooldown) {
 			for (int i = enemiesList.size() - 1; i >= 0; i--) {
-				enemy currentEnemy = enemiesList.get(i); //gets currentEnemy with arrayList
+				Enemy currentEnemy = enemiesList.get(i); //gets currentEnemy with arrayList
 				if (checkCollision(player, currentEnemy.enemyShape)) { //Checks if enemy touches player
 					playerHealth -= currentEnemy.enemyDamage;
 					int newHealth = Math.max(0, playerHealth);
@@ -485,11 +506,11 @@ public class Game extends Application {
 	//Projectile damage check
 	public void projectileHitDetection() {
 		for (int i = projectileList.size() - 1; i >= 0; i--) { //iterates through array backwards to prevent crashing
-			projectileAbility currentProjectile = projectileList.get(i);
+			ProjectileAbility currentProjectile = projectileList.get(i);
 			boolean projectileRemoved = false;  //If projectile is removed, everything is skipped
 
 			for (int j = enemiesList.size() - 1; j >= 0 && !projectileRemoved; j--) { //iternates through array backwards to prevent crashing
-				enemy currentEnemy = enemiesList.get(j);
+				Enemy currentEnemy = enemiesList.get(j);
 
 				if (checkCollision(currentProjectile.projectileShape, currentEnemy.enemyShape)) { //determines if projectile hits an enemy
 					currentEnemy.enemyHealth -= currentProjectile.projectileDamage;
@@ -519,7 +540,7 @@ public class Game extends Application {
 
 	//Fireball projectile
 	public void projectileFireball(double x, double y) {
-		projectileAbility fireball = new projectileAbility("fireball", x, y);
+		ProjectileAbility fireball = new ProjectileAbility("fireball", x, y);
 		double changeX = mouseClickX - x; //finds the x component
 		double changeY = mouseClickY - y; //finds the y component
 		double distance = Math.sqrt(Math.pow(changeX, 2) + Math.pow(changeY, 2)); //pythagorean theorm to determine the distance 
@@ -532,7 +553,7 @@ public class Game extends Application {
 		//Move projectiles
 	public void moveProjectile() { //Moves projectile to mouse click
 		for (int i = projectileList.size() - 1; i >= 0; i--) {
-			projectileAbility p = projectileList.get(i);
+			ProjectileAbility p = projectileList.get(i);
 
 			if (p.type.equals( "fireball")) {
 				p.projectileShape.setX(p.projectileShape.getX() + p.velocityX);
@@ -548,35 +569,90 @@ public class Game extends Application {
 		}
 	}
 
-	//Class that contains abilties
-	public class projectileAbility {
+//Class that contains projectile abilties
+	public class ProjectileAbility {
 		double projectileSpeed;
 		int projectileDamage;
 		Rectangle projectileShape;
 		String type;
 		double velocityX;
 		double velocityY;
+		double cooldown;
+		boolean boomerangIsReturning;
 
-		projectileAbility (String projectileType, double coordX, double coordY) {
+		long lastHitTime = 0;
+
+		ProjectileAbility (String projectileType, double coordX, double coordY) {
 			type = projectileType;
 			if (type.equals("fireball")) {
+				//Stats for fireball
 				projectileSpeed = 4.0;
 				projectileDamage = 25;
+				cooldown = 0.5 * 1e9;
 
-				//Image for projectile
-                Image image = new Image("/assets/fireball.png", false);
-                ImagePattern imagePattern = new ImagePattern(image);
-				projectileShape = new Rectangle(20, 20, Color.TRANSPARENT);
-                projectileShape.setCache(true);
-                projectileShape.setFill(imagePattern);
+				//Image for fireball
+				projectileShape = new Rectangle(40, 40, Color.TRANSPARENT);
+				projectileShape.setCache(true);
+				projectileShape.setFill(fireballPattern);
 			}
-				projectileShape.setX(coordX);
-				projectileShape.setY(coordY);
+
+			if (type.equals("boomerang")) {
+				//Stats for boomerang
+				projectileSpeed = 3.0;
+				projectileDamage = 20;
+				cooldown = 0.5 * 1e9;
+				boomerangIsReturning = false;
+
+				//Image for boomerang
+				projectileShape = new Rectangle(30, 50, Color.TRANSPARENT);
+				projectileShape.setCache(true);
+				projectileShape.setFill(boomerangPattern);
+			}
+			projectileShape.setX(coordX);
+			projectileShape.setY(coordY);
 		}
 	}
 
-	//Class for all different types of enemeies
-	public class enemy {
+	//Class that contains all passive abilities
+	public class PassiveAbility {
+		double healAmount;
+		double healChance;
+		double cooldown;
+		double auraDamage;
+		Rectangle lifeStealShape;
+		Circle auraShape;
+		String type;
+
+		PassiveAbility (String PassiveAbilityType) {
+			type = PassiveAbilityType;
+
+			if (type.equals("lifeSteal")) {
+				//Stats for lifesteal
+				healChance = 0.5;
+				healAmount = 10;
+				cooldown = 2 * 1e9;
+
+				//Image for lifeSteal
+				lifeStealShape = new Rectangle(10, 20, Color.TRANSPARENT);
+				lifeStealShape.setCache(true);
+				lifeStealShape.setFill(lifeStealPattern);
+			}
+
+			if (type.equals("aura")) {
+				//Stats for aura
+				auraDamage = 20;
+				cooldown = 0.5 * 1e9;
+
+				//Image for aura
+				auraShape = new Circle(50, Color.TRANSPARENT);
+				auraShape.setCache(true);
+				auraShape.setFill(auraPattern);
+			}
+		}
+	}
+
+	//Class that contains all different types of enemeies
+	public class Enemy {
 		int enemyHealth;
 		double enemySpeed;
 		int enemyDamage;
@@ -584,59 +660,63 @@ public class Game extends Application {
 		Rectangle enemyShape;
 		String type;
 
-		enemy (String enemyType, double coordX, double coordY) {
+		Enemy (String enemyType, double coordX, double coordY) {
 			type = enemyType;
 			if (type.equals("normal")) {
-				enemyHealth = 50;
+				//Stats for normal slime
+				enemyHealth = 65;
 				enemySpeed = 1.0;
 				enemyDamage = 10;
+				enemyXp = 10;
+
 				//Image for normal slime
-                Image image = new Image("/assets/Slimes/normal.png", false);
-                ImagePattern imagePattern = new ImagePattern(image);
-				enemyShape = new Rectangle(50, 50, Color.TRANSPARENT);
-                enemyShape.setCache(true); //reduces resources used (performance increase)
-                enemyShape.setFill(imagePattern);
+				enemyShape = new Rectangle(70, 70, Color.TRANSPARENT);
+				enemyShape.setCache(true);
+				enemyShape.setFill(normalSlimePattern);
 			}
 
 			if (type.equals("tank")) {
+				//Stats for tank slime
 				enemyHealth = 100;
 				enemySpeed = 0.5;
 				enemyDamage = 5;
+				enemyXp = 20;
+
 				//Image for tank slime
-				Image image = new Image("/assets/Slimes/tank.png", false);
-                ImagePattern imagePattern = new ImagePattern(image);
-				enemyShape = new Rectangle(50, 50, Color.TRANSPARENT);
-                enemyShape.setCache(true);
-                enemyShape.setFill(imagePattern);
+				enemyShape = new Rectangle(70, 70, Color.TRANSPARENT);
+				enemyShape.setCache(true);
+				enemyShape.setFill(tankSlimePattern);
 			}
 
 			if (type.equals("fast")) {
-				enemyHealth = 25;
+				//Stats for fast slime
+				enemyHealth = 50;
 				enemySpeed = 2.0;
 				enemyDamage = 15;
+				enemyXp = 15;
+
 				//Image for fast slime
-				Image image = new Image("/assets/Slimes/fast.png", false);
-                ImagePattern imagePattern = new ImagePattern(image);
-				enemyShape = new Rectangle(50, 50, Color.TRANSPARENT);
-                enemyShape.setCache(true);
-                enemyShape.setFill(imagePattern);
+				enemyShape = new Rectangle(70, 70, Color.TRANSPARENT);
+				enemyShape.setCache(true);
+				enemyShape.setFill(fastSlimePattern);
 			}
 
 			if (type.equals("boss")) {
-				enemyHealth = 200;
+				//Stats for boss slime
+				enemyHealth = 500;
 				enemySpeed = 0.1;
 				enemyDamage = 20;
+				enemyXp = 50;
+
 				//Image for boss slime
-				Image image = new Image("/assets/Slimes/boss.png", false);
-                ImagePattern imagePattern = new ImagePattern(image);
-				enemyShape = new Rectangle(90, 90, Color.TRANSPARENT);
-                enemyShape.setCache(true);
-                enemyShape.setFill(imagePattern);
+				enemyShape = new Rectangle(130, 130, Color.TRANSPARENT);
+				enemyShape.setCache(true);
+				enemyShape.setFill(bossSlimePattern);
 			}
-			//Sets the coordinates for the enemies
+			
+			//Sets the coordinates for the enemy
 			enemyShape.setX(coordX);
 			enemyShape.setY(coordY);
 		}
 	}
-
 }
