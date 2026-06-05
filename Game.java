@@ -39,8 +39,10 @@ import javafx.stage.Screen;
 public class Game extends Application {
 	//Declaring variables for player
 	int playerHealth = 100;
+	int maxPlayerHealth = 100;
 	double playerSpeed = 3.0;
 	int playerXp = 0;
+	int maxPlayerXp = 100;
 	int playerLevel = 0;
 	boolean playerLeveledUp = false;
 	int enemiesDefeated = 0;
@@ -83,6 +85,16 @@ public class Game extends Application {
 	Rectangle xpBarBackground;
 	double xpBarMaxWidth = 200.0;
 	Text lvlText = new Text( "level " + playerLevel);
+
+	//Abilities (If stack is zero, player has not obtained it)
+	int maxStack = 3;
+	int lifeStealStack = 0;
+	int boomerangStack = 0;
+	int auraStack = 0;
+	PassiveAbility auraEnable;
+	PassiveAbility lifeStealEnable;
+	boolean auraInitialized = false;
+	boolean lifeStealInitialized = false;
 
 	//Enemies killed;
 	Text defeatedText = new Text("Slain: " + enemiesDefeated);
@@ -453,7 +465,6 @@ public class Game extends Application {
 
     //creates a random spawn location for an enemy around the border of the screen
 	public Enemy spawnLocation(String enemyType, double coordX, double coordY) {
-		 random = new Random(); //creates a random spawn location with java's random class
 		int possibility = random.nextInt(1, 5);
 		if (possibility == 1) { //spawns on the left border
 			coordX = primaryScreenBounds.getMinX();
@@ -518,6 +529,9 @@ public class Game extends Application {
 					game.getChildren().remove(currentProjectile.projectileShape);
 					projectileList.remove(i);
 
+					if (currentEnemy.enemyHealth >= 0) {
+						lifeStealAbility();
+
 						playerXp += currentEnemy.enemyXp;
 						while (playerXp >= 100) { //Levels up player
 							playerLevel++;
@@ -534,6 +548,7 @@ public class Game extends Application {
 						game.getChildren().remove(currentEnemy.enemyShape);
 						enemiesDefeated++;
 					}
+				}
 				}
 			}
 		}
@@ -565,6 +580,29 @@ public class Game extends Application {
 					projectileList.remove(i);
 					game.getChildren().remove(p.projectileShape);
 				}
+			}
+		}
+	}
+
+	//Lifesteal Ability
+	public void lifeStealAbility() {
+		if (lifeStealStack > 0) { //lifesteal ability
+
+			if (!lifeStealInitialized) {
+       		 lifeStealEnable = new PassiveAbility("lifeSteal");
+       		 lifeStealInitialized = true;
+    	}
+
+			double chance = (lifeStealEnable.healChance * lifeStealStack) * maxPlayerHealth;
+
+			if (random.nextInt(maxPlayerHealth) < chance) { //A chance for player to gain health
+				playerHealth += lifeStealEnable.healAmount;
+
+				if (playerHealth > maxPlayerHealth) {
+					playerHealth = maxPlayerHealth;
+				}
+				healthBar.setWidth((playerHealth / 100.0) * healthBarMaxWdith);
+				healthNumber.setText(playerHealth + "/ " + maxPlayerHealth);
 			}
 		}
 	}
