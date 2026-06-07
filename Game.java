@@ -65,6 +65,9 @@ public class Game extends Application {
 
 	//Cooldowns
 	long lastDamageTime;
+	long lastAuraTime;
+	long lastFireballTime;
+	long weaponCooldown;
 	long damageCooldown = (long) (5 * 1e8);
 
 	//Timer
@@ -110,6 +113,7 @@ public class Game extends Application {
 	//Mouse Click 
 	double mouseClickX;
 	double mouseClickY;
+	boolean isMouseClicked;
 
 	//All images
 	ImagePattern fireballPattern;
@@ -235,6 +239,8 @@ public class Game extends Application {
         lastSpawnTime = System.nanoTime();
 		lastBossSpawnTime = System.nanoTime();
 		lastDamageTime = System.nanoTime();
+		lastAuraTime = System.nanoTime();
+		lastFireballTime = System.nanoTime();
 		
 		DropShadow shadow = new DropShadow(); //Creates a shadow effect on text
 		shadow.setOffsetX(4.0f);
@@ -261,16 +267,18 @@ public class Game extends Application {
 		keyState.put(KeyCode.S, false);
 		keyState.put(KeyCode.D, false);
 		//Adds key pressed to hashmap.
-		scene.setOnKeyPressed(event -> keyState.put(event.getCode(), true));
-		scene.setOnKeyReleased(event -> keyState.put(event.getCode(), false));
-		//Adds Mouse click
-		scene.setOnMouseClicked(event -> {
-			if (event.getButton() == MouseButton.PRIMARY) { //Runs if left click of mouse is clicked
+		game.setOnKeyPressed(event -> keyState.put(event.getCode(), true));
+		game.setOnKeyReleased(event -> keyState.put(event.getCode(), false));
+
+		game.setOnMouseClicked(event -> {
+			if (event.getButton() == MouseButton.PRIMARY) { 
+				game.requestFocus();
 				mouseClickX = event.getSceneX();
 				mouseClickY = event.getSceneY();
-				projectileFireball(player.getX(), player.getY()); //Creates the projectile
+				isMouseClicked = true;
 			}
-		});
+			});
+
 		//Animation timer for smooth gameplay
 		timer = new AnimationTimer() {
 			@Override
@@ -282,6 +290,16 @@ public class Game extends Application {
 				playerDamageCheck(now);
 				moveProjectile();
 				projectileHitDetection();
+
+				//Adds Mouse click
+				if (isMouseClicked) {
+				if (now - lastFireballTime >= weaponCooldown) { //Cooldown for fireball
+					projectileFireball(player.getX(), player.getY());
+					lastFireballTime = now; //Resets cooldown
+				}
+					isMouseClicked = false;
+				}
+
 				if (playerHealth <= 0) { //Ends the game when health reaches zero
 					end(gameStart);
 					stop();
@@ -410,8 +428,13 @@ public class Game extends Application {
 	}
 
 	//Checks if enemy is touching the player (Collision Detection)
-	public boolean checkCollision(Rectangle player, Rectangle enemy) {
+	public boolean checkCollisionRectangle(Rectangle player, Rectangle enemy) {
 		return (player.getBoundsInParent().intersects(enemy.getBoundsInParent())); //checks if player intersects with an enemy
+	}
+
+	//Checks if enemy is touching the player (Collision Detection)
+	public boolean checkCollisionCircle(Circle ability, Rectangle enemy) {
+		return ability.getBoundsInParent().intersects(enemy.getBoundsInParent()); //checks if player intersects with an enemy
 	}
 
 
@@ -423,7 +446,7 @@ public class Game extends Application {
 			double enemyY = currentEnemy.enemyShape.getY();
 			double enemySpeed = currentEnemy.enemySpeed;
 			//Knockback for enemy so enemy does not clip into player
-			if (checkCollision(player, currentEnemy.enemyShape)) {
+			if (checkCollisionRectangle(player, currentEnemy.enemyShape)) {
 				double knockback = 45.0;
 
 				if (enemyY > player.getY()) {
@@ -504,7 +527,7 @@ public class Game extends Application {
 		if (now - lastDamageTime > damageCooldown) {
 			for (int i = enemiesList.size() - 1; i >= 0; i--) {
 				Enemy currentEnemy = enemiesList.get(i); //gets currentEnemy with arrayList
-				if (checkCollision(player, currentEnemy.enemyShape)) { //Checks if enemy touches player
+				if (checkCollisionRectangle(player, currentEnemy.enemyShape)) { //Checks if enemy touches player
 					playerHealth -= currentEnemy.enemyDamage;
 					int newHealth = Math.max(0, playerHealth);
 					healthBar.setWidth((newHealth / 100.0) * healthBarMaxWdith); //Changes healthbar visual
@@ -523,7 +546,7 @@ public class Game extends Application {
 			for (int j = enemiesList.size() - 1; j >= 0 && !projectileRemoved; j--) { //iternates through array backwards to prevent crashing
 				Enemy currentEnemy = enemiesList.get(j);
 
-				if (checkCollision(currentProjectile.projectileShape, currentEnemy.enemyShape)) { //determines if projectile hits an enemy
+				if (checkCollisionRectangle(currentProjectile.projectileShape, currentEnemy.enemyShape)) { //determines if projectile hits an enemy
 					currentEnemy.enemyHealth -= currentProjectile.projectileDamage;
 					projectileRemoved = true;
 					game.getChildren().remove(currentProjectile.projectileShape);
@@ -579,6 +602,61 @@ public class Game extends Application {
 				if (projectileX > screenWidth || projectileX < 0 || projectileY > screenHeight || projectileY < 0 ) {
 					projectileList.remove(i);
 					game.getChildren().remove(p.projectileShape);
+				}
+			}
+		}
+	}
+
+	//Damage detection for aura
+	public void auraAbility(long now) {
+		if (auraStack <= 0) { //Ensures if ability is owned
+			return;
+		}
+
+		if (!auraInitialized) {
+        auraEnable = new PassiveAbility("aura");
+        game.getChildren().add(auraEnable.auraShape);
+        auraInitialized = true;
+    	}
+
+		//Creates the aura around the player
+		auraEnable.auraShape.setRadius(50.0 + (auraStack * 10));
+		double auraMiddleX = player.getX() + (player.getWidth() / 2);
+		double auraMiddleY = player.getY() + (player.getHeight() / 2);
+		auraEnable.auraShape.setCenterX(auraMiddleX);
+		auraEnable.auraShape.setCenterY(auraMiddleY);
+
+		//Cooldown for aura ability
+		if (now - lastAuraTime >= auraEnable.cooldown) {
+			lastAuraTime = now;
+			double auraDamage = auraEnable.auraDamage;
+			for (int i = enemiesList.size() - 1; i >= 0; i--) {
+				Enemy currentEnemy = enemiesList.get(i);
+
+				if (checkCollisionCircle(auraEnable.auraShape, currentEnemy.enemyShape)) {
+					currentEnemy.enemyHealth -= auraDamage;
+
+					if (currentEnemy.enemyHealth <= 0) {
+						lifeStealAbility();
+						playerXp += currentEnemy.enemyXp;
+
+						if (auraStack == maxStack && boomerangStack == maxStack && lifeStealStack == maxStack) { //Sees if player is at max level
+							lvlText.setText("Max level");
+						}
+
+						while (playerXp >= maxPlayerXp) {
+							playerLevel++;
+							playerLeveledUp = true;
+							playerXp -= maxPlayerXp;
+							lvlText.setText("level " + playerLevel);
+						}
+
+						xpBar.setWidth((playerXp / (double) maxPlayerXp) * xpBarMaxWidth);
+						enemiesList.remove(i);
+						game.getChildren().remove(currentEnemy.enemyShape);
+						enemiesDefeated++;
+						defeatedText.setText("Slain: " + enemiesDefeated);
+					}
 				}
 			}
 		}
