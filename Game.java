@@ -6,7 +6,7 @@
 
         * Date Created: May,28 2026
 
-        * Date Last Modified: June 3, 2026
+        * Date Last Modified: June 8, 2026
 
         */
 
@@ -128,6 +128,12 @@ public class Game extends Application {
 	//Map
 	Pane game;
 
+	//Difficulty
+	int difficulty;
+	int easyMultiplyer = 1;
+	int mediumMultiplyer = 2;
+	int hardMultiplyer = 3;
+
 	public static void main(String[] args) {
 		launch();
 	}
@@ -142,17 +148,54 @@ public class Game extends Application {
 		shadow.setOffsetX(4.0f);
 		shadow.setOffsetY(4.0f);
 		title.setEffect(shadow);
-		Text text = new Text("Survive the Waves...");
-		text.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 25px; -fx-fill: white");
+		Text text1 = new Text("Survive the Waves....");
+		Text text2 = new Text("Choose Difficulty\n");
+		text1.setStyle("-fx-font-family: 'Impact'; -fx-font-weight: bold; -fx-font-size: 25px; -fx-fill: LEMONCHIFFON");
+		text2.setStyle("-fx-font-family: 'Impact'; -fx-font-weight: bold; -fx-font-size: 25px; -fx-fill: LEMONCHIFFON");
 
-		//Buttons to play the game
-		Button button = new Button("Click to Play!");
-		button.setStyle("-fx-font-family: 'Impact'; -fx-font-size: 15px; -fx-fill: black");
-		VBox layout = new VBox(10);
+		//Button Style
+		String buttonStyle = 
+			"-fx-background-color: #2c276e; " +
+		    "-fx-border-color: #2c2c2c; " +
+		    "-fx-border-width: 4px; " +
+		    "-fx-border-radius: 10px; " +
+		    "-fx-background-radius: 14px; " +
+		    "-fx-text-fill: white; " +
+		    "-fx-font-family: 'Monospaced'; " +
+		    "-fx-font-size: 16px; " +
+		    "-fx-padding: 10px;" +
+		    "-fx-pref-width: 200px; " +
+		    "-fx-pref-height: 5px; " +
+		    "-fx-text-alignment: center;";
+
+		//Buttons to begin playing the game
+		Button easy = new Button("[    Easy    ]");
+		Button medium = new Button("[   Medium   ]");
+		Button hard = new Button("[    Hard    ]");
+		easy.setStyle(buttonStyle);
+		medium.setStyle(buttonStyle);
+		hard.setStyle(buttonStyle);
+
+		VBox layout = new VBox(13);
 		layout.setAlignment(Pos.CENTER);
-		layout.getChildren().addAll(title, text, button);
+		layout.getChildren().addAll(title, text1, text2, easy, medium, hard);
+
 		//Determins if a button is pressed
-		button.setOnAction(event -> gameStart(menu));
+		//Determines if button is pressed
+		easy.setOnAction(event -> {
+			difficulty = easyMultiplyer;
+			gameStart(menu);
+		});
+
+		medium.setOnAction(event -> {
+			difficulty = mediumMultiplyer;
+			gameStart(menu);
+		});
+
+		hard.setOnAction(event -> {
+			difficulty = hardMultiplyer;
+			gameStart(menu);
+		});
 
 		//Creates a image for the background
         Image backgroundImage = new Image("/assets/menu.png", false);
@@ -606,6 +649,7 @@ public class Game extends Application {
 		}
 
 		//Move projectiles
+	//Move projectiles
 	public void moveProjectile() { //Moves projectile to mouse click
 		for (int i = projectileList.size() - 1; i >= 0; i--) {
 			ProjectileAbility p = projectileList.get(i);
@@ -615,10 +659,44 @@ public class Game extends Application {
 				p.projectileShape.setY(p.projectileShape.getY() + p.velocityY);
 				double projectileY = p.projectileShape.getY();
 				double projectileX = p.projectileShape.getX();
-				//removes porjectiles that pass the screen border
+
+				//removes projectiles that pass the screen border
 				if (projectileX > screenWidth || projectileX < 0 || projectileY > screenHeight || projectileY < 0 ) {
 					projectileList.remove(i);
 					game.getChildren().remove(p.projectileShape);
+				}
+			}
+
+			if (p.type.equals ("boomerang")) {
+				double targetX = player.getX() + player.getWidth() / 2;
+				double targetY = player.getY() + player.getHeight() / 2;
+				double boomerangX = p.projectileShape.getX();
+				double boomerangY = p.projectileShape.getY();
+
+				double changeX = targetX - boomerangX;
+				double changeY = targetY - boomerangY;
+				double distance = Math.sqrt(Math.pow(changeX, 2) + Math.pow(changeY, 2)); //Pythagorean theorm to determine the distance
+
+				//Determins if boomerang is coming back or being thrown
+				if (p.boomerangIsReturning) {
+					double returnSpeed = 3.0;
+					if (distance < 15) {
+						projectileList.remove(i);
+						game.getChildren().remove(p.projectileShape);
+						p.boomerangIsReturning = false;
+					}
+					else {
+						p.projectileShape.setX(p.projectileShape.getX() + (changeX / distance) * returnSpeed);
+						p.projectileShape.setY(p.projectileShape.getY() + (changeY / distance) * returnSpeed);
+					}
+				}
+
+				else {
+					p.projectileShape.setX(p.projectileShape.getX() + p.velocityX);
+					p.projectileShape.setY(p.projectileShape.getY() + p.velocityY);
+					if (p.projectileShape.getX() < 0 || p.projectileShape.getX() > screenWidth || p.projectileShape.getY() < 0 || p.projectileShape.getY() > screenHeight ) {
+						p.boomerangIsReturning = true;
+					}
 				}
 			}
 		}
@@ -846,7 +924,7 @@ public class Game extends Application {
 			type = enemyType;
 			if (type.equals("normal")) {
 				//Stats for normal slime
-				enemyHealth = 65;
+				enemyHealth = 25 * difficulty;
 				enemySpeed = 1.0;
 				enemyDamage = 10;
 				enemyXp = 10;
@@ -859,7 +937,7 @@ public class Game extends Application {
 
 			if (type.equals("tank")) {
 				//Stats for tank slime
-				enemyHealth = 100;
+				enemyHealth = 75 * difficulty;
 				enemySpeed = 0.5;
 				enemyDamage = 5;
 				enemyXp = 20;
@@ -872,7 +950,7 @@ public class Game extends Application {
 
 			if (type.equals("fast")) {
 				//Stats for fast slime
-				enemyHealth = 50;
+				enemyHealth = 15 * difficulty;
 				enemySpeed = 2.0;
 				enemyDamage = 15;
 				enemyXp = 15;
@@ -885,7 +963,7 @@ public class Game extends Application {
 
 			if (type.equals("boss")) {
 				//Stats for boss slime
-				enemyHealth = 500;
+				enemyHealth = 500 * difficulty;
 				enemySpeed = 0.1;
 				enemyDamage = 20;
 				enemyXp = 50;
