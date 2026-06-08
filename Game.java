@@ -267,8 +267,8 @@ public class Game extends Application {
 		keyState.put(KeyCode.S, false);
 		keyState.put(KeyCode.D, false);
 		//Adds key pressed to hashmap.
-		game.setOnKeyPressed(event -> keyState.put(event.getCode(), true));
-		game.setOnKeyReleased(event -> keyState.put(event.getCode(), false));
+		scene.setOnKeyPressed(event -> keyState.put(event.getCode(), true));
+		scene.setOnKeyReleased(event -> keyState.put(event.getCode(), false));
 
 		game.setOnMouseClicked(event -> {
 			if (event.getButton() == MouseButton.PRIMARY) { 
@@ -289,7 +289,9 @@ public class Game extends Application {
 				enemyDetection();
 				playerDamageCheck(now);
 				moveProjectile();
-				projectileHitDetection();
+				projectileHitDetection(now);
+				auraAbility(now);
+				boomerangAbility(now);
 
 				//Adds Mouse click
 				if (isMouseClicked) {
@@ -538,7 +540,7 @@ public class Game extends Application {
 	}
 
 	//Projectile damage check
-	public void projectileHitDetection() {
+	public void projectileHitDetection(long now) {
 		for (int i = projectileList.size() - 1; i >= 0; i--) { //iterates through array backwards to prevent crashing
 			ProjectileAbility currentProjectile = projectileList.get(i);
 			boolean projectileRemoved = false;  //If projectile is removed, everything is skipped
@@ -546,35 +548,50 @@ public class Game extends Application {
 			for (int j = enemiesList.size() - 1; j >= 0 && !projectileRemoved; j--) { //iternates through array backwards to prevent crashing
 				Enemy currentEnemy = enemiesList.get(j);
 
-				if (checkCollisionRectangle(currentProjectile.projectileShape, currentEnemy.enemyShape)) { //determines if projectile hits an enemy
-					currentEnemy.enemyHealth -= currentProjectile.projectileDamage;
-					projectileRemoved = true;
-					game.getChildren().remove(currentProjectile.projectileShape);
-					projectileList.remove(i);
+				if (checkCollisionRectangle(currentProjectile.projectileShape, currentEnemy.enemyShape)) { //Determines if projectile hits an enemy
+					if (currentProjectile.type.equals("boomerang")) {
+						if (now - currentProjectile.lastHitTime >= currentProjectile.cooldown) {
+							currentEnemy.enemyHealth -= currentProjectile.projectileDamage;
+							currentProjectile.lastHitTime = now;
+						}
+					}
 
-					if (currentEnemy.enemyHealth >= 0) {
+					if (currentProjectile.type.equals("fireball")) {
+						currentEnemy.enemyHealth -= currentProjectile.projectileDamage;
+						projectileRemoved = true;
+						game.getChildren().remove(currentProjectile.projectileShape);
+						projectileList.remove(i);
+					}
+
+					if (currentEnemy.enemyHealth <= 0) { //Lifesteal ability activiates when enemy health is zero
 						lifeStealAbility();
 
 						playerXp += currentEnemy.enemyXp;
-						while (playerXp >= 100) { //Levels up player
+						while (playerXp >= maxPlayerXp) { //Levels up player
 							playerLevel++;
 							playerLeveledUp = true;
-							lvlText.setText("level " + playerLevel);
-							playerXp -= 100;
-							xpBar.setWidth(0);
+							playerXp -= maxPlayerXp;
 						}
 
-						xpBar.setWidth((playerXp / 100.0) * xpBarMaxWidth); //Changes xpBar visual
+						if (auraStack == maxStack && boomerangStack == maxStack && lifeStealStack == maxStack) { //Lvl text will display "Max level"
+							lvlText.setText("Max level");
+							xpBar.setWidth(xpBarMaxWidth);
+						}
+						else {
+							lvlText.setText("level " + playerLevel);
+    						xpBar.setWidth((playerXp / (double) maxPlayerXp) * xpBarMaxWidth);
+							xpBar.setWidth((playerXp / (double) maxPlayerXp) * xpBarMaxWidth); //Changes xpBar visual
+						}
+						enemiesDefeated++;
 						defeatedText.setText("Slain: " + enemiesDefeated);
 
 						enemiesList.remove(j);
 						game.getChildren().remove(currentEnemy.enemyShape);
-						enemiesDefeated++;
 					}
-				}
 				}
 			}
 		}
+	}
 
 	//Fireball projectile
 	public void projectileFireball(double x, double y) {
@@ -604,6 +621,55 @@ public class Game extends Application {
 					game.getChildren().remove(p.projectileShape);
 				}
 			}
+		}
+	}
+
+	//boomerang projectile
+	public void boomerangAbility(long now) {
+		if (boomerangStack <= 0 || enemiesList.isEmpty()) { //Ensures boomerang ability will not activate if ability is not owned or no enemies
+			return;
+		}
+
+		int activeBoomerangCount = 0;
+		for (int i = 0; i < projectileList.size(); i++) { //Determines the boomerangs active on screen
+			ProjectileAbility p = projectileList.get(i);
+			if (p.type.equals("boomerang")) {
+				activeBoomerangCount++;
+			}
+		}
+
+		int boomerangToSpawn = boomerangStack - activeBoomerangCount;
+
+		//Only creates the amount of boomerangs based on how many stack of the boomerang ability you have
+		for (int i = 0; i < boomerangToSpawn; i++) {
+			double startX = player.getX() + player.getWidth() / 2;
+			double startY = player.getY() + player.getHeight() / 2;
+			ProjectileAbility boomerang = new ProjectileAbility("boomerang", startX, startY);
+
+			Enemy target = enemiesList.get(random.nextInt(enemiesList.size())); //gets random target from arrayList
+
+			double targetX = target.enemyShape.getX() + target.enemyShape.getWidth() / 2;
+			double targetY = target.enemyShape.getY() + target.enemyShape.getHeight() / 2;
+
+			double changeX = targetX - startX;
+			double changeY = targetY - startY;
+			double distance = Math.sqrt(Math.pow(changeX, 2) + Math.pow(changeY, 2)); //Pythagorean theorm to determine the distane
+
+			if (distance == 0) { //Ensures code does not divide by zero
+				distance = 1;
+			}
+			if (distance > 0) {
+				boomerang.velocityX = ((changeX / distance) * boomerang.projectileSpeed);
+				boomerang.velocityY = ((changeY / distance) * boomerang.projectileSpeed);
+			} 
+			else {
+				boomerang.velocityX = boomerang.projectileSpeed;
+				boomerang.velocityY = 0;
+			}
+
+			projectileList.add(boomerang);
+			game.getChildren().add(boomerang.projectileShape);
+
 		}
 	}
 
