@@ -2,11 +2,11 @@
 
         * Game: Wavebound.io
 
-        * Author: Jacky
+        * Author: Jacky Lui
 
         * Date Created: May,28 2026
 
-        * Date Last Modified: June 8, 2026
+        * Date Last Modified: June 9, 2026
 
         */
 
@@ -14,6 +14,8 @@ import javafx.application.Application;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
@@ -35,6 +37,7 @@ import javafx.scene.image.Image;
 import java.util.ArrayList;
 import javafx.geometry.Rectangle2D;
 import javafx.stage.Screen;
+import javafx.scene.image.ImageView;
 
 public class Game extends Application {
 	//Declaring variables for player
@@ -157,13 +160,13 @@ public class Game extends Application {
 		String buttonStyle = 
 			"-fx-background-color: #2c276e; " +
 		    "-fx-border-color: #2c2c2c; " +
-		    "-fx-border-width: 4px; " +
+		    "-fx-border-width: 4px; " + //border
 		    "-fx-border-radius: 10px; " +
-		    "-fx-background-radius: 14px; " +
+		    "-fx-background-radius: 14px; " + //rounding
 		    "-fx-text-fill: white; " +
 		    "-fx-font-family: 'Monospaced'; " +
 		    "-fx-font-size: 16px; " +
-		    "-fx-padding: 10px;" +
+		    "-fx-padding: 10px;" + //spacing
 		    "-fx-pref-width: 200px; " +
 		    "-fx-pref-height: 5px; " +
 		    "-fx-text-alignment: center;";
@@ -198,7 +201,7 @@ public class Game extends Application {
 		});
 
 		//Creates a image for the background
-        Image backgroundImage = new Image("/assets/menu.png", false);
+        Image backgroundImage = new Image("/assets/background/menu.png", false);
         ImagePattern backgroundPattern = new ImagePattern(backgroundImage);
         Rectangle background = new Rectangle(screenWidth, screenHeight);
         background.setCache(true);
@@ -217,18 +220,18 @@ public class Game extends Application {
 	//Stage for the game itself
 	public void gameStart(Stage gameStart) {
 		//Loads all images at once
-		fireballPattern = new ImagePattern(new Image("/assets/fireball.png"));
-		boomerangPattern = new ImagePattern(new Image("/assets/boomerang.png"));
+		fireballPattern = new ImagePattern(new Image("/assets/abilities/fireball.png"));
+		boomerangPattern = new ImagePattern(new Image("/assets/abilities/boomerang.png"));
+		lifeStealPattern = new ImagePattern(new Image("/assets/abilities/lifesteal.png"));
+		auraPattern = new ImagePattern(new Image("/assets/abilities/aura.png"));
 		normalSlimePattern = new ImagePattern(new Image("/assets/slimes/normal.png"));
 		tankSlimePattern = new ImagePattern(new Image("/assets/slimes/tank.png"));
 		fastSlimePattern = new ImagePattern(new Image("/assets/slimes/fast.png"));
 		bossSlimePattern = new ImagePattern(new Image("/assets/slimes/boss.png"));
-		lifeStealPattern = new ImagePattern(new Image("/assets/lifesteal.png"));
-		auraPattern = new ImagePattern(new Image("/assets/aura.png"));
 		
 		//Creates background for the game
 		game = new Pane();
-		Image backgroundImage = new Image("/assets/background.png", false);
+		Image backgroundImage = new Image("/assets/background/background.png", false);
         ImagePattern backgroundPattern = new ImagePattern(backgroundImage);
         Rectangle background = new Rectangle(screenWidth, screenHeight);
         background.setCache(true);
@@ -237,7 +240,7 @@ public class Game extends Application {
 
 		//Creates player with an image
 		player = new Rectangle(60, 60, Color.TRANSPARENT);
-		Image playerImage = new Image("/assets/Player.png", false);
+		Image playerImage = new Image("/assets/player.png", false);
 		ImagePattern playerPattern = new ImagePattern(playerImage);
 		player.setFill(playerPattern);
 		player.setCache(true);
@@ -349,6 +352,15 @@ public class Game extends Application {
 					end(gameStart);
 					stop();
 				}
+
+				if (playerLeveledUp) { //Shows ability screen if the player has gained a level
+					playerLeveledUp = false;
+					//If all abilities are collected, abilities menu will not show
+					if (!(auraStack == maxStack && boomerangStack == maxStack && lifeStealStack == maxStack)) {
+						abilitiesMenu(game, scene);
+					}
+				}
+				//Ensures enemies or player cannot go behind the ui elemnts
 				healthBackground.toFront();
 				healthBar.toFront();
 				healthNumber.toFront();
@@ -360,6 +372,100 @@ public class Game extends Application {
 				}
 		};
 		timer.start();
+	}
+
+	//If player leveled up, abilities menu will show
+	public void abilitiesMenu(Pane game, Scene gameScene) {
+		timer.stop();
+
+		StackPane abilitiesMenu = new StackPane();
+		abilitiesMenu.setPrefSize(screenWidth, screenHeight);
+		HBox layout = new HBox(30);
+		layout.setAlignment(Pos.CENTER);
+
+		//Creates visual for the ability card
+		String cardStyle =
+		    "-fx-background-color: #121212; " +
+		    "-fx-border-color: #2c2c2c; " +
+		    "-fx-border-width: 4px; " + //border
+		    "-fx-border-radius: 10px; " +
+		    "-fx-background-radius: 14px; " + //rounds corners
+		    "-fx-text-fill: white; " +
+		    "-fx-font-family: 'Monospaced'; " +
+		    "-fx-font-size: 16px; " +
+		    "-fx-padding: 25px;" + //spacing
+		    "-fx-pref-width: 280px; " +
+		    "-fx-pref-height: 450px; " +
+		    "-fx-text-alignment: center;";
+		
+		//Makes the entire card a button
+		Button lifeSteal = new Button("Life Steal\n\nGain health \nfrom killing slimes.\n\nLvl " + lifeStealStack + "/" + maxStack + "\n\nPassive");
+		Button aura = new Button("Aura\n\nCreates a\ndamaging radius.\n\nLvl " + auraStack + "/" + maxStack + "\n\nActive");
+		Button boomerang = new Button("Boomerang\n\nThrows a returning \nprojectile.\n\nLvl " + boomerangStack + "/" + maxStack + "\n\nPassive");
+
+		//Determines if player has gotten the max stack of each abilitiy
+		if (lifeStealStack == maxStack) {
+			lifeSteal.setText("Life Steal\n\nGain health \nfrom killing slimes.\n\nMax level" + "\n\nPassive Ability");
+		}
+
+		if (auraStack == maxStack) {
+			aura.setText("Aura\n\nCreates a\ndamaging radius.\n\nMax level" + "\n\nActive Ability");
+		}
+
+		if (boomerangStack == maxStack) {
+			boomerang.setText("Boomerang\n\nThrows a returning\nprojectile.\n\nMax level" + "\n\nActive Ability");
+		}
+
+		//Loads images for the ability icon
+		ImageView imageAura = new ImageView(new Image("/assets/aura.png", 64, 64, true, true));
+		ImageView imageLifesteal = new ImageView(new Image("/assets/lifesteal.png", 64, 64, true, true));
+		ImageView imageBoomerang = new ImageView(new Image("/assets/boomerang.png", 64, 64, true, true));
+		
+		//Wraps image in imageview (display my icons)
+		lifeSteal.setGraphic(imageLifesteal);
+		aura.setGraphic(imageAura);
+		boomerang.setGraphic(imageBoomerang);
+
+		//Positioning
+		aura.setContentDisplay(ContentDisplay.TOP);
+		boomerang.setContentDisplay(ContentDisplay.TOP);
+		lifeSteal.setContentDisplay(ContentDisplay.TOP);
+		lifeSteal.setStyle(cardStyle);
+		aura.setStyle(cardStyle);
+		boomerang.setStyle(cardStyle);
+
+		layout.getChildren().addAll(aura, lifeSteal, boomerang);
+		StackPane.setAlignment(layout, Pos.CENTER);
+		abilitiesMenu.getChildren().add(layout);
+		abilitiesMenu.setStyle("-fx-background-color: #000000bd;"); //creates a translucent effect
+		game.getChildren().add(abilitiesMenu);
+
+		//Action event for each button
+		if (lifeStealStack != maxStack) {
+			lifeSteal.setOnAction (event -> {
+				game.getChildren().remove(abilitiesMenu);
+				game.requestFocus();
+				lifeStealStack++;
+				timer.start();
+			});
+		}
+		if (auraStack != maxStack) {
+			aura.setOnAction (event -> {
+				game.getChildren().remove(abilitiesMenu);
+				game.requestFocus();
+				auraStack++;
+				timer.start();
+			});
+		}
+		if (boomerangStack != maxStack) {
+			boomerang.setOnAction(event -> {
+				game.getChildren().remove(abilitiesMenu);
+				game.requestFocus();
+
+				boomerangStack++;
+				timer.start();
+			});
+		}
 	}
 
 	//Will run if the player reaches zero health
@@ -375,7 +481,7 @@ public class Game extends Application {
 		layout.setAlignment(Pos.CENTER);
 		layout.getChildren().addAll(gameOver, scoreText, button);
 		//Game over background
-        Image backgroundImage = new Image("/assets/gameOver.png", false);
+        Image backgroundImage = new Image("/assets/background/gameOver.png", false);
         ImagePattern backgroundPattern = new ImagePattern(backgroundImage);
         Rectangle background = new Rectangle(screenWidth, screenHeight);
         background.setCache(true);
@@ -465,11 +571,6 @@ public class Game extends Application {
 				lastSpawnTime = now;
 			}
 		}
-        if(minutes == 5 && seconds == 0) { //when the time reaches 5 minutes, the boss wil spawn
-            Enemy newEnemy = spawnLocation("normal", 0, 0);
-            enemiesList.add(newEnemy);
-            game.getChildren().add(newEnemy.enemyShape);
-        }
 	}
 
 	//Checks if enemy is touching the player (Collision Detection)
@@ -651,7 +752,7 @@ public class Game extends Application {
 		//Move projectiles
 	//Move projectiles
 	public void moveProjectile() { //Moves projectile to mouse click
-		for (int i = projectileList.size() - 1; i >= 0; i--) {
+		for (int i = projectileList.size() - 1; i >= 0; i--) { //goes through arraylist backwards (prevents crashing)
 			ProjectileAbility p = projectileList.get(i);
 
 			if (p.type.equals( "fireball")) {
@@ -888,7 +989,7 @@ public class Game extends Application {
 
 			if (type.equals("lifeSteal")) {
 				//Stats for lifesteal
-				healChance = 0.5;
+				healChance = 0.25;
 				healAmount = 10;
 				cooldown = 2 * 1e9;
 
