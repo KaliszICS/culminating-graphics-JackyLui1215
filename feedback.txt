@@ -1,0 +1,12 @@
+K(30%): 100
+I(30%): 95
+C(10%): 100
+A(30%): 95
+97%
+
+Very well made!
+
+Only a couple criticism.  Going diagonal should not really speed up your movement and so should be calculated different when both buttons are pressed.
+Also the collision feels much larger than the characters on the screen.
+
+Otherwise Great work!
